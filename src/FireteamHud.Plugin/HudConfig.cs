@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using BepInEx.Configuration;
 using FireteamHud.Core;
@@ -15,6 +17,15 @@ namespace FireteamHud
     }
 
     public enum ListSide { Left, Right }
+
+    /// <summary>Per-player colour choice. Named values follow <see cref="Palette.Names"/>.</summary>
+    public enum SquadColour
+    {
+        Auto,
+        Red, Green, Blue, Yellow, Orange, Purple, Cyan, Pink, White, Lime,
+        Magenta, Sky, Gold, Teal, Coral, Lavender, Mint, Crimson, Peach, Olive,
+        Custom
+    }
 
     public enum MarkerStyle { Chevron, Diamond, Dot }
 
@@ -39,7 +50,11 @@ namespace FireteamHud
     public class HudConfig
     {
         readonly ConfigFile _file;
-        readonly Dictionary<string, ConfigEntry<Color>> _playerColours = new Dictionary<string, ConfigEntry<Color>>();
+        const string PlayerSection = "6. Player colours";
+        const string CustomSection = "6b. Custom colours";
+
+        readonly Dictionary<string, ConfigEntry<SquadColour>> _choices = new Dictionary<string, ConfigEntry<SquadColour>>();
+        readonly Dictionary<string, ConfigEntry<Color>> _customColours = new Dictionary<string, ConfigEntry<Color>>();
 
         public ConfigEntry<bool> Enabled;
         public ConfigEntry<KeyboardShortcut> ToggleKey;
@@ -186,20 +201,79 @@ namespace FireteamHud
         }
 
         /// <summary>
-        /// Colour for a player. Each new nickname gets its own entry under "Player colours",
-        /// seeded from the STHUD palette, so a friend keeps the same colour every raid.
+        /// A player's colour choice as a palette index, <see cref="Palette.Auto"/> or
+        /// <see cref="Palette.Custom"/>. Each new nickname gets a dropdown under
+        /// "Player colours" the first time you raid together.
         /// </summary>
-        public Color ColourFor(string nickname, int joinIndex)
+        public int PickFor(string nickname)
+        {
+            var choice = Choice(nickname).Value;
+            if (choice == SquadColour.Auto) return Palette.Auto;
+            if (choice == SquadColour.Custom) return Palette.Custom;
+            return (int)choice - 1;
+        }
+
+        /// <summary>The free-form colour used when a player's choice is Custom.</summary>
+        public Color CustomColourFor(string nickname, Color fallback)
         {
             var key = SanitiseKey(nickname);
-            if (!_playerColours.TryGetValue(key, out var entry))
+            if (!_customColours.TryGetValue(key, out var entry))
             {
-                var d = Palette.ForIndex(joinIndex);
-                entry = _file.Bind("6. Player colours", key, new Color(d.R, d.G, d.B, d.A),
-                    "Colour for " + nickname + ". Added automatically the first time you raid together.");
-                _playerColours[key] = entry;
+                entry = _file.Bind(CustomSection, key, fallback,
+                    "Used when " + nickname + "'s colour under Player colours is set to Custom.");
+                _customColours[key] = entry;
             }
             return entry.Value;
+        }
+
+        ConfigEntry<SquadColour> Choice(string nickname)
+        {
+            var key = SanitiseKey(nickname);
+            if (_choices.TryGetValue(key, out var entry)) return entry;
+
+            var def = new ConfigDefinition(PlayerSection, key);
+            var initial = SquadColour.Auto;
+
+            // Version 0.2 stored a raw colour here. Keep what the player saw: a palette colour
+            // becomes that named choice, anything else becomes Custom with the same value.
+            if (TakeLegacyColour(def, out var legacy))
+            {
+                int index = Palette.IndexOf(new Rgba(legacy.r, legacy.g, legacy.b, legacy.a));
+                if (index >= 0) initial = (SquadColour)(index + 1);
+                else
+                {
+                    initial = SquadColour.Custom;
+                    CustomColourFor(nickname, legacy);
+                }
+            }
+
+            entry = _file.Bind(def, initial, new ConfigDescription(
+                "Colour for " + nickname + " on the HUD and nametags. Auto takes the next colour nobody has picked; Custom uses the colour under Custom colours."));
+            _choices[key] = entry;
+            return entry;
+        }
+
+        /// <summary>
+        /// Reads and removes a not-yet-bound value saved in the old colour format, so binding
+        /// the new dropdown to the same key doesn't fail to parse it.
+        /// </summary>
+        bool TakeLegacyColour(ConfigDefinition def, out Color colour)
+        {
+            colour = default;
+            try
+            {
+                var prop = typeof(ConfigFile).GetProperty("OrphanedEntries", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (!(prop?.GetValue(_file) is Dictionary<ConfigDefinition, string> orphans)) return false;
+                if (!orphans.TryGetValue(def, out var raw) || string.IsNullOrEmpty(raw)) return false;
+                if (Enum.IsDefined(typeof(SquadColour), raw.Trim())) return false; // already the new format
+                if (!ColorUtility.TryParseHtmlString("#" + raw.Trim().TrimStart('#'), out colour)) return false;
+                orphans.Remove(def);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         /// <summary>BepInEx config keys can't contain = \n \t \\ " ' [ ].</summary>

@@ -19,6 +19,8 @@ namespace FireteamHud
 
         SquadSource _source;
         bool _wasPreview;
+        readonly Dictionary<string, Color> _colours = new Dictionary<string, Color>();
+        readonly List<int> _picks = new List<int>();
         float _nextRoster;
 
         public SquadRoster Roster { get; } = new SquadRoster();
@@ -34,14 +36,43 @@ namespace FireteamHud
         public Player PlayerFor(SquadMember member) =>
             member != null && _source != null && _source.Players.TryGetValue(member.Id, out var p) && p != null ? p : null;
 
-        /// <summary>Colour of a member as shown everywhere: dead grey, otherwise their configured colour.</summary>
+        /// <summary>Colour of a member as shown everywhere: dead grey, otherwise their resolved colour.</summary>
         public Color ColourOf(SquadMember member)
         {
-            if (member.Status != MemberStatus.Alive) return new Color(Palette.Dead.R, Palette.Dead.G, Palette.Dead.B, Palette.Dead.A);
-            return Config.ColourFor(member.Name, member.JoinIndex);
+            if (member.Status != MemberStatus.Alive) return ToColor(Palette.Dead);
+            return _colours.TryGetValue(member.Id, out var c) ? c : Color.white;
         }
 
+        /// <summary>
+        /// Resolves everyone's colour from their dropdowns in one pass, so Auto colours avoid
+        /// the ones picked by hand. Runs every frame; it is a handful of dictionary lookups.
+        /// </summary>
+        void ResolveColours()
+        {
+            var members = Roster.Members;
+            _picks.Clear();
+            foreach (var m in members) _picks.Add(Config.PickFor(m.Name));
+            var slots = Palette.Assign(_picks);
+
+            _colours.Clear();
+            for (int i = 0; i < members.Count; i++)
+            {
+                var m = members[i];
+                _colours[m.Id] = slots[i] == Palette.Custom
+                    ? Config.CustomColourFor(m.Name, ToColor(Palette.ForIndex(m.JoinIndex)))
+                    : ToColor(Palette.ForIndex(slots[i]));
+            }
+        }
+
+        static Color ToColor(Rgba c) => new Color(c.R, c.G, c.B, c.A);
+
         void Update()
+        {
+            UpdateRoster();
+            ResolveColours();
+        }
+
+        void UpdateRoster()
         {
             if (Config.Preview.Value != _wasPreview)
             {

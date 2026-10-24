@@ -58,7 +58,9 @@ namespace FireteamHud.Tests
         {
             Assert.Equal(Palette.Red, Palette.ForIndex(0));
             Assert.Equal(Palette.Yellow, Palette.ForIndex(3));
-            Assert.Equal(Palette.ForIndex(0), Palette.ForIndex(9));
+            Assert.Equal(20, Palette.Count);
+            Assert.Equal(Palette.Count, Palette.Names.Length);
+            Assert.Equal(Palette.ForIndex(0), Palette.ForIndex(20));
         }
     }
 }

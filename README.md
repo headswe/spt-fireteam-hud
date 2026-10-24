@@ -10,10 +10,12 @@ there is nothing to install on the server.
 - **Name list:** a list next to the radar with a colour swatch, name and distance for each
   teammate. Teammates who die show `KIA` and stay greyed out. Teammates who extract or
   disconnect show `—`.
-- **Per-player colours:** the first four are STHUD's red, green, blue and yellow, then
-  orange, purple, cyan, pink and white. Each nickname gets its own colour entry the first
-  time you raid together, so your friends keep their colours from raid to raid. You can
-  change any of them.
+- **Per-player colours:** 20 named colours. Auto starts with STHUD's red, green, blue
+  and yellow, then orange, purple, cyan, pink, white, lime, magenta, sky, gold, teal,
+  coral, lavender, mint, crimson, peach and olive. Each nickname gets a dropdown the
+  first time you raid together, so your friends keep their colours from raid to raid.
+  Choose a named colour, Auto, or Custom for any colour at all (set under *Custom
+  colours*). Auto never gives someone a colour you've already picked for another player.
 - **Configurable area:** all settings are live in the BepInEx Configuration Manager
   (F12): anchor to any of 9 screen positions, X/Y offset, scale, size, range, opacity,
   background, and which side the list goes on.
@@ -72,8 +74,13 @@ stay hidden.
 | Radar | Show, Size, Range (m), Dot size, out-of-range rings, elevation arrow threshold, self arrow, half-range ring |
 | Name list | Show, Side (left/right), Width, Font size, Distance, keep dead/gone |
 | Colours | Your own arrow colour |
-| Player colours | One entry per teammate nickname, added automatically. Used by the HUD and the nametags |
+| Player colours | A dropdown per teammate nickname (Auto, 20 named colours, Custom), added automatically. Used by the HUD and the nametags |
+| Custom colours | The exact colour for players set to Custom |
 | Nametags | Enabled, toggle key, turn off Fika plates, marker shape and size, name mode, uppercase, font size, distance, health bar, focus radius, max distance, far scale, height, opacity behind cover and while aiming, optics, near fade, off-screen arrows |
+
+Upgrading from 0.2: your per-player colours carry over. A colour that was one of the
+old defaults becomes that named colour, and anything else becomes Custom with the same
+value.
 
 ## Who counts as a teammate
 

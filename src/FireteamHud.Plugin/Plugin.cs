@@ -6,7 +6,7 @@ namespace FireteamHud
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "com.headswe.fireteamhud";
-        public const string Version = "0.2.0";
+        public const string Version = "0.3.0";
 
         HudConfig _config;
 
