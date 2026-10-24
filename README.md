@@ -20,6 +20,33 @@ there is nothing to install on the server.
 
 The HUD only appears in raid while you have teammates. Press **Home** to hide it.
 
+## Nametags
+
+Battlefield-style teammate markers that replace Fika's name plates. They use the same
+colours as the HUD: both read one shared roster and the same per-player colour settings,
+so a player's colour always matches.
+
+- **A marker over every teammate.** It's a chevron by default, or a diamond or dot, in
+  the player's colour with a dark outline, so it stands out against bright skies, foliage
+  and dark interiors. It shrinks with distance down to a set minimum ("Far scale"), so it
+  stays readable at 300 m instead of disappearing.
+- **Names only when you look.** The name and distance fade in for the teammate near your
+  crosshair, and everyone else is just a marker. You can set names to Always or Never.
+- **Downed teammates:** a pulsing red cross with `DOWNED` and the distance, always shown,
+  so you know who needs a revive. This is the only status shown. There are no effect
+  icons, limb skeletons or faction badges.
+- **Behind cover**, the tag fades smoothly to a set opacity instead of popping in and out.
+- **Off-screen arrows** at the screen edge point to teammates behind or beside you, with
+  their distance.
+- **Optional:** tags dim while you aim, project correctly through magnified scopes (or can
+  be hidden there), fade when a teammate is right next to you, and can show a thin health
+  bar (off by default).
+
+Press **End** to hide the nametags. On startup the plugin turns off Fika's own name
+plates. Turn them back on under *Fika → Coop | Name Plates* if you remove this plugin.
+If the Fika host disables name plates for the raid, these nametags respect that and
+stay hidden.
+
 ## Install
 
 1. Build it (see below).
@@ -34,6 +61,8 @@ The HUD only appears in raid while you have teammates. Press **Home** to hide it
    beyond range, and one keeps dying.
 2. Adjust the **Layout** settings until it sits where you want it, for example the
    default *BottomCenter* with Offset Y `-90` above the stance and health indicators.
+   In a raid, the dummies also get nametags. One of them is downed, so you can tune the
+   look of the tags as well.
 3. Turn Preview off before you play.
 
 | Section | Settings |
@@ -43,7 +72,8 @@ The HUD only appears in raid while you have teammates. Press **Home** to hide it
 | Radar | Show, Size, Range (m), Dot size, out-of-range rings, elevation arrow threshold, self arrow, half-range ring |
 | Name list | Show, Side (left/right), Width, Font size, Distance, keep dead/gone |
 | Colours | Your own arrow colour |
-| Player colours | One entry per teammate nickname, added automatically |
+| Player colours | One entry per teammate nickname, added automatically. Used by the HUD and the nametags |
+| Nametags | Enabled, toggle key, turn off Fika plates, marker shape and size, name mode, uppercase, font size, distance, health bar, focus radius, max distance, far scale, height, opacity behind cover and while aiming, optics, near fade, off-screen arrows |
 
 ## Who counts as a teammate
 
@@ -69,23 +99,28 @@ dotnet test tests/FireteamHud.Tests   # radar maths, layout and roster; no game 
 Layout:
 
 - `src/FireteamHud.Core`: the game-independent parts, with unit tests.
-  - radar projection
+  - radar projection, nametag scaling, focus fade and off-screen arrows
   - placing the HUD on screen
   - the roster that tracks alive, dead and gone teammates
   - the palette
 - `src/FireteamHud.Plugin`: the BepInEx plugin.
-  - `SquadSource.cs`: the only file that touches EFT or Fika
-  - `HudRenderer.cs`: IMGUI drawing
+  - `SquadSource.cs` and `NametagRenderer.cs`: the files that touch EFT types
+  - `FikaCompat.cs`: reads Fika's config through BepInEx, with no Fika reference
+  - `SquadTracker.cs`: the shared roster behind the HUD and the nametags
+  - `HudRenderer.cs`, `NametagRenderer.cs`: IMGUI drawing
   - `HudConfig.cs`: settings
   - `Textures.cs`: generated shapes, so the plugin needs no asset bundle
 
 ## Status
 
-- **Not yet tested in-game.** The core has unit tests. The plugin compiles against the
+- The HUD has been tested live with Fika. **The nametags have not been tested in-game
+  yet.** The core has unit tests. The plugin compiles against the
   real BepInEx 5.4 and Unity 2022.3 APIs, but EFT's classes were stubbed for the check.
 - The EFT members it uses are `GameWorld.MainPlayer`, `GameWorld.AllAlivePlayersList`,
   `Player.Position`, `Player.Rotation`, `Player.ProfileId`, `Player.Profile.Nickname`,
   `Player.Profile.Info.GroupId`, `Player.IsAI` and `Player.HealthController.IsAlive`. If
   your SPT version renames one of them, the build fails in `SquadSource.cs`.
-- The view direction comes from `Camera.main`. If that is null, it falls back to the
-  player's yaw.
+- The nametags also use `CameraManager`, `PlayerBones.Neck`, `ProceduralWeaponAnimation`
+  and `HealthController.GetBodyPartHealth`. Fika's own name plates use the same members.
+- The view direction comes from EFT's `CameraManager` camera, falling back to
+  `Camera.main` and then to the player's yaw.

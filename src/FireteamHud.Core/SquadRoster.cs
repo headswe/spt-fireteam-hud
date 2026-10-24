@@ -18,10 +18,14 @@ namespace FireteamHud.Core
         public string Name;
         public float X, Y, Z;
         public bool Alive;
+        /// <summary>Fika revive: down and bleeding out, waiting for a teammate.</summary>
+        public bool Downed;
+        /// <summary>0..1 total health, or -1 when unknown.</summary>
+        public float Health;
 
         public MemberSighting(string id, string name, float x, float y, float z, bool alive)
         {
-            Id = id; Name = name; X = x; Y = y; Z = z; Alive = alive;
+            Id = id; Name = name; X = x; Y = y; Z = z; Alive = alive; Downed = false; Health = -1f;
         }
     }
 
@@ -35,6 +39,9 @@ namespace FireteamHud.Core
         public float Y { get; internal set; }
         public float Z { get; internal set; }
         public MemberStatus Status { get; internal set; }
+        public bool Downed { get; internal set; }
+        /// <summary>0..1 total health, or -1 when unknown.</summary>
+        public float Health { get; internal set; } = -1f;
     }
 
     /// <summary>
@@ -64,11 +71,17 @@ namespace FireteamHud.Core
                 m.Name = string.IsNullOrEmpty(s.Name) ? s.Id : s.Name;
                 m.X = s.X; m.Y = s.Y; m.Z = s.Z;
                 m.Status = s.Alive ? MemberStatus.Alive : MemberStatus.Dead;
+                m.Downed = s.Alive && s.Downed;
+                m.Health = s.Health;
             }
 
             foreach (var m in _members)
             {
-                if (!_seen.Contains(m.Id) && m.Status == MemberStatus.Alive) m.Status = MemberStatus.Gone;
+                if (!_seen.Contains(m.Id) && m.Status == MemberStatus.Alive)
+                {
+                    m.Status = MemberStatus.Gone;
+                    m.Downed = false;
+                }
             }
         }
 

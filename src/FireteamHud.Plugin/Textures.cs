@@ -11,6 +11,9 @@ namespace FireteamHud
         public static Texture2D TriangleUp { get; private set; }
         public static Texture2D TriangleDown { get; private set; }
         public static Texture2D Pixel { get; private set; }
+        public static Texture2D Diamond { get; private set; }
+        public static Texture2D Chevron { get; private set; }
+        public static Texture2D Plus { get; private set; }
 
         public static void Create()
         {
@@ -21,6 +24,40 @@ namespace FireteamHud
             TriangleUp = Triangle(32, true);
             TriangleDown = Triangle(32, false);
             Pixel = Make(1, (x, y) => 1f);
+            Diamond = Shape(64, (u, v) => (Mathf.Abs(u) + Mathf.Abs(v) - 0.9f) * 0.7071f);
+            Chevron = Shape(64, (u, v) =>
+                Mathf.Min(Segment(u, v, -0.8f, 0.5f, 0f, -0.4f), Segment(u, v, 0f, -0.4f, 0.8f, 0.5f)) - 0.17f);
+            Plus = Shape(64, (u, v) =>
+                Mathf.Min(Box(u, v, 0.26f, 0.85f), Box(u, v, 0.85f, 0.26f)));
+        }
+
+        /// <summary>
+        /// Builds a texture from a signed distance function over u,v in [-1, 1] (v up),
+        /// negative inside. Gives crisp, anti-aliased edges at any draw size.
+        /// </summary>
+        static Texture2D Shape(int size, System.Func<float, float, float> sdf)
+        {
+            float half = size / 2f;
+            return Make(size, (x, y) =>
+            {
+                float u = (x + 0.5f - half) / half, v = (y + 0.5f - half) / half;
+                return Mathf.Clamp01(0.5f - sdf(u, v) * half);
+            });
+        }
+
+        static float Segment(float px, float py, float ax, float ay, float bx, float by)
+        {
+            float vx = bx - ax, vy = by - ay, wx = px - ax, wy = py - ay;
+            float t = Mathf.Clamp01((wx * vx + wy * vy) / (vx * vx + vy * vy));
+            float dx = wx - vx * t, dy = wy - vy * t;
+            return Mathf.Sqrt(dx * dx + dy * dy);
+        }
+
+        static float Box(float u, float v, float hw, float hh)
+        {
+            float dx = Mathf.Abs(u) - hw, dy = Mathf.Abs(v) - hh;
+            float outside = Mathf.Sqrt(Mathf.Max(dx, 0f) * Mathf.Max(dx, 0f) + Mathf.Max(dy, 0f) * Mathf.Max(dy, 0f));
+            return outside + Mathf.Min(Mathf.Max(dx, dy), 0f);
         }
 
         /// <summary>Anti-aliased circle; <paramref name="thickness"/> is a fraction of the radius, 0 for filled.</summary>

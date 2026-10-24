@@ -6,6 +6,7 @@ using System.Reflection;
 using BepInEx.Logging;
 using Comfort.Common;
 using EFT;
+using EFT.CameraControl;
 using FireteamHud.Core;
 using UnityEngine;
 
@@ -31,6 +32,9 @@ namespace FireteamHud
         readonly ManualLogSource _log;
         readonly List<MemberSighting> _buffer = new List<MemberSighting>();
 
+        /// <summary>Teammates from the last <see cref="Teammates"/> call, by profile id.</summary>
+        public readonly Dictionary<string, Player> Players = new Dictionary<string, Player>();
+
         Type _coopHandlerType;
         MemberInfo _humanPlayersMember;
         bool _fikaSearched;
@@ -55,14 +59,22 @@ namespace FireteamHud
 
         public SelfPose PoseOf(Player player)
         {
-            var cam = Camera.main;
+            var cam = GameCamera();
             float yaw = cam != null ? cam.transform.eulerAngles.y : player.Rotation.x;
             return new SelfPose { Position = player.Position, Yaw = yaw };
+        }
+
+        /// <summary>EFT's player camera; Camera.main as a fallback.</summary>
+        public static Camera GameCamera()
+        {
+            var manager = CameraManager.Instance;
+            return manager != null && manager.Camera != null ? manager.Camera : Camera.main;
         }
 
         public List<MemberSighting> Teammates(Player self, TeammateSource source)
         {
             _buffer.Clear();
+            Players.Clear();
             IEnumerable<Player> players = null;
 
             if (source != TeammateSource.SameGroup) players = FikaHumans();
@@ -74,7 +86,12 @@ namespace FireteamHud
                 if (p == null || p == self || p.ProfileId == self.ProfileId) continue;
                 var pos = p.Position;
                 bool alive = p.HealthController != null && p.HealthController.IsAlive;
-                _buffer.Add(new MemberSighting(p.ProfileId, p.Profile?.Nickname, pos.x, pos.y, pos.z, alive));
+                _buffer.Add(new MemberSighting(p.ProfileId, p.Profile?.Nickname, pos.x, pos.y, pos.z, alive)
+                {
+                    Downed = alive && IsDowned(p),
+                    Health = alive ? Health01(p) : 0f
+                });
+                Players[p.ProfileId] = p;
             }
             return _buffer;
         }
@@ -138,14 +155,31 @@ namespace FireteamHud
             }
         }
 
-        /// <summary>Bots replicated to Fika clients are observed players that report IsAI false.</summary>
-        static bool IsObservedAI(Player p)
+        static float Health01(Player p)
+        {
+            try
+            {
+                var h = p.HealthController.GetBodyPartHealth(EBodyPart.Common, true);
+                return h.Maximum > 0 ? Mathf.Clamp01(h.Current / h.Maximum) : -1f;
+            }
+            catch (Exception) { return -1f; }
+        }
+
+        /// <summary>FikaPlayer.Downed (Fika's revive system); false without Fika.</summary>
+        static bool IsDowned(Player p) => ReadBool(p, "Downed", DownedProps);
+
+        static readonly Dictionary<Type, PropertyInfo> DownedProps = new Dictionary<Type, PropertyInfo>();
+
+        static bool ReadBool(Player p, string name, Dictionary<Type, PropertyInfo> cache)
         {
             var type = p.GetType();
-            if (!ObservedAiProps.TryGetValue(type, out var prop))
-                ObservedAiProps[type] = prop = type.GetProperty("IsObservedAI", AnyInstance);
+            if (!cache.TryGetValue(type, out var prop))
+                cache[type] = prop = type.GetProperty(name, AnyInstance);
             return prop != null && prop.GetValue(p) is bool b && b;
         }
+
+        /// <summary>Bots replicated to Fika clients are observed players that report IsAI false.</summary>
+        static bool IsObservedAI(Player p) => ReadBool(p, "IsObservedAI", ObservedAiProps);
 
         static readonly Dictionary<Type, PropertyInfo> ObservedAiProps = new Dictionary<Type, PropertyInfo>();
 

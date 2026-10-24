@@ -16,6 +16,23 @@ namespace FireteamHud
 
     public enum ListSide { Left, Right }
 
+    public enum MarkerStyle { Chevron, Diamond, Dot }
+
+    public enum NameMode
+    {
+        /// <summary>Names fade in for the teammate near your crosshair (Battlefield style).</summary>
+        WhenLooking,
+        Always,
+        Never
+    }
+
+    public enum OpticMode
+    {
+        /// <summary>Project tags through the scope's zoomed view, like Fika does.</summary>
+        Show,
+        Hide
+    }
+
     /// <summary>
     /// All settings, editable live in the BepInEx Configuration Manager (F12 by default).
     /// </summary>
@@ -53,6 +70,28 @@ namespace FireteamHud
         public ConfigEntry<bool> ShowGone;
 
         public ConfigEntry<Color> SelfColour;
+
+        public ConfigEntry<bool> TagsEnabled;
+        public ConfigEntry<KeyboardShortcut> TagsToggleKey;
+        public ConfigEntry<bool> DisableFikaPlates;
+        public ConfigEntry<MarkerStyle> TagMarker;
+        public ConfigEntry<int> TagMarkerSize;
+        public ConfigEntry<NameMode> TagNames;
+        public ConfigEntry<bool> TagUppercase;
+        public ConfigEntry<int> TagFontSize;
+        public ConfigEntry<bool> TagDistance;
+        public ConfigEntry<bool> TagHealthBar;
+        public ConfigEntry<float> TagFocusRadius;
+        public ConfigEntry<float> TagMaxDistance;
+        public ConfigEntry<float> TagFarScale;
+        public ConfigEntry<float> TagHeight;
+        public ConfigEntry<float> TagOpacity;
+        public ConfigEntry<float> TagOccludedOpacity;
+        public ConfigEntry<float> TagAdsOpacity;
+        public ConfigEntry<OpticMode> TagOptics;
+        public ConfigEntry<float> TagNearFade;
+        public ConfigEntry<bool> TagEdgeArrows;
+        public ConfigEntry<int> TagEdgeMargin;
 
         public HudConfig(ConfigFile file)
         {
@@ -104,6 +143,46 @@ namespace FireteamHud
             ShowGone = file.Bind(list, "Show dead and gone", true, "Keep teammates who died or left in the list, greyed out.");
 
             SelfColour = file.Bind("5. Colours", "Self", Color.white, "Colour of your own arrow.");
+
+            const string tags = "7. Nametags";
+            TagsEnabled = file.Bind(tags, "Enabled", true,
+                "Markers and names over teammates, in the same colours as the HUD. Hidden when the Fika host disables name plates.");
+            TagsToggleKey = file.Bind(tags, "Toggle key", new KeyboardShortcut(KeyCode.End), "Shows or hides the nametags.");
+            DisableFikaPlates = file.Bind(tags, "Turn off Fika name plates", true,
+                "Switches Fika's own name plates off at startup so they don't stack with these. Turn Fika's back on under Fika > Coop | Name Plates if you remove this plugin.");
+            TagMarker = file.Bind(tags, "Marker", MarkerStyle.Chevron, "Shape over each teammate's head.");
+            TagMarkerSize = file.Bind(tags, "Marker size", 16, new ConfigDescription("Pixels at close range.",
+                new AcceptableValueRange<int>(6, 64)));
+            TagNames = file.Bind(tags, "Names", NameMode.WhenLooking,
+                "WhenLooking shows the name and distance only for the teammate near your crosshair; everyone else is just a marker.");
+            TagUppercase = file.Bind(tags, "Uppercase names", true, "Easier to read at a glance.");
+            TagFontSize = file.Bind(tags, "Font size", 14, new ConfigDescription("Pixels at close range.",
+                new AcceptableValueRange<int>(8, 40)));
+            TagDistance = file.Bind(tags, "Show distance", true, "Distance under the name.");
+            TagHealthBar = file.Bind(tags, "Show health bar", false, "Thin health bar under the name.");
+            TagFocusRadius = file.Bind(tags, "Focus radius", 0.12f, new ConfigDescription(
+                "How close to the crosshair a teammate must be for their name to show, as a fraction of screen height.",
+                new AcceptableValueRange<float>(0.02f, 0.5f)));
+            TagMaxDistance = file.Bind(tags, "Max distance (m)", 500f, new ConfigDescription("Beyond this no tag is drawn.",
+                new AcceptableValueRange<float>(20f, 2000f)));
+            TagFarScale = file.Bind(tags, "Far scale", 0.65f, new ConfigDescription(
+                "Size at 150 m and beyond relative to close range. Tags never shrink further, so they stay readable.",
+                new AcceptableValueRange<float>(0.3f, 1f)));
+            TagHeight = file.Bind(tags, "Height above head (m)", 0.45f, new ConfigDescription("Where the marker floats.",
+                new AcceptableValueRange<float>(0f, 2f)));
+            TagOpacity = file.Bind(tags, "Opacity", 1f, new ConfigDescription("", new AcceptableValueRange<float>(0.1f, 1f)));
+            TagOccludedOpacity = file.Bind(tags, "Behind cover opacity", 0.5f, new ConfigDescription(
+                "Opacity when a wall is between you and the teammate. Fades smoothly instead of popping. 0 hides them.",
+                new AcceptableValueRange<float>(0f, 1f)));
+            TagAdsOpacity = file.Bind(tags, "Aiming opacity", 0.6f, new ConfigDescription("Multiplier while aiming down sights.",
+                new AcceptableValueRange<float>(0f, 1f)));
+            TagOptics = file.Bind(tags, "In magnified optics", OpticMode.Show, "Show tags through zoomed scopes, or hide them.");
+            TagNearFade = file.Bind(tags, "Fade within (m)", 3f, new ConfigDescription(
+                "Tags fade out when a teammate is this close, so they don't cover their face.",
+                new AcceptableValueRange<float>(0f, 15f)));
+            TagEdgeArrows = file.Bind(tags, "Off-screen arrows", true, "Arrows at the screen edge pointing to teammates out of view.");
+            TagEdgeMargin = file.Bind(tags, "Off-screen arrow margin", 70, new ConfigDescription("Distance of the arrows from the screen edge in pixels.",
+                new AcceptableValueRange<int>(10, 400)));
         }
 
         /// <summary>

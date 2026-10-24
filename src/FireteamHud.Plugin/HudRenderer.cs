@@ -5,80 +5,23 @@ using UnityEngine;
 
 namespace FireteamHud
 {
-    /// <summary>Collects squad data in Update and draws the radar and name list with IMGUI.</summary>
+    /// <summary>Draws the radar and name list with IMGUI from the shared <see cref="SquadTracker"/>.</summary>
     public class HudRenderer : MonoBehaviour
     {
-        const float RosterInterval = 0.1f;
-
         public HudConfig Config;
-        public ManualLogSource Log;
+        public SquadTracker Squad;
 
-        SquadSource _source;
-        readonly SquadRoster _roster = new SquadRoster();
-        SelfPose _self;
-        bool _inRaid;
         bool _hiddenByKey;
-        bool _wasPreview;
-        float _nextRoster;
         GUIStyle _label;
         GUIStyle _labelRight;
         int _styleFontSize;
 
-        static readonly string[] PreviewNames = { "Alpha", "Bravo", "Charlie", "Delta" };
-
-        void Start()
-        {
-            _source = new SquadSource(Log);
-            Textures.Create();
-        }
+        SquadRoster _roster => Squad.Roster;
+        SelfPose _self => Squad.Self;
 
         void Update()
         {
             if (Config.ToggleKey.Value.IsDown()) _hiddenByKey = !_hiddenByKey;
-            if (Config.Preview.Value != _wasPreview)
-            {
-                _wasPreview = Config.Preview.Value;
-                _roster.Clear(); // don't leave dummies (or real mates) behind as "gone"
-            }
-
-            var player = _source.MainPlayer();
-            if (player == null)
-            {
-                if (_inRaid) { _roster.Clear(); _source.Reset(); }
-                _inRaid = false;
-                _self = new SelfPose();
-                if (Config.Preview.Value) UpdatePreview();
-                return;
-            }
-
-            if (!_inRaid) _roster.Clear(); // new raid, new roster
-            _inRaid = true;
-            _self = _source.PoseOf(player);
-
-            if (Config.Preview.Value) { UpdatePreview(); return; }
-            if (Time.unscaledTime < _nextRoster) return;
-            _nextRoster = Time.unscaledTime + RosterInterval;
-            _roster.Update(_source.Teammates(player, Config.Source.Value));
-        }
-
-        /// <summary>Four dummies circling at different distances and heights, one beyond range.</summary>
-        void UpdatePreview()
-        {
-            float t = Time.unscaledTime;
-            float range = Config.Range.Value;
-            var sightings = new List<MemberSighting>();
-            for (int i = 0; i < PreviewNames.Length; i++)
-            {
-                float angle = t * (0.3f + 0.1f * i) + i * Mathf.PI / 2f;
-                float dist = range * (0.25f + 0.3f * i);
-                float height = i == 1 ? 6f : i == 2 ? -6f : 0f;
-                sightings.Add(new MemberSighting("preview-" + i, PreviewNames[i],
-                    _self.Position.x + Mathf.Cos(angle) * dist,
-                    _self.Position.y + height,
-                    _self.Position.z + Mathf.Sin(angle) * dist,
-                    i != 3 || (int)(t / 4f) % 2 == 0));
-            }
-            _roster.Update(sightings);
         }
 
         void OnGUI()
@@ -86,7 +29,7 @@ namespace FireteamHud
             if (Event.current.type != EventType.Repaint) return;
             if (!Config.Enabled.Value || _hiddenByKey) return;
             bool preview = Config.Preview.Value;
-            if (!preview && (!_inRaid || _roster.Members.Count == 0)) return;
+            if (!preview && (!Squad.InRaid || _roster.Members.Count == 0)) return;
             if (!Config.ShowRadar.Value && !Config.ShowNameList.Value) return;
 
             float scale = Config.Scale.Value;
@@ -151,12 +94,18 @@ namespace FireteamHud
                 if (p.Clamped && !Config.ShowOutOfRange.Value) continue;
 
                 var pos = new Vector2(centre.x + p.Offset.X, centre.y + p.Offset.Y);
-                var colour = m.Status == MemberStatus.Dead ? ToColor(Palette.Dead) : Config.ColourFor(m.Name, m.JoinIndex);
+                var colour = Squad.ColourOf(m);
                 colour.a *= opacity;
                 GUI.color = colour;
 
                 float size = p.Clamped ? dot * 0.85f : dot;
                 GUI.DrawTexture(Square(pos, size), p.Clamped ? Textures.Ring : Textures.Disc);
+                if (m.Downed)
+                {
+                    GUI.color = Downed.Pulse(opacity);
+                    GUI.DrawTexture(Square(pos, size * 1.9f), Textures.Ring);
+                    GUI.color = colour;
+                }
 
                 float threshold = Config.ElevationThreshold.Value;
                 if (threshold > 0 && m.Status == MemberStatus.Alive)
@@ -197,7 +146,7 @@ namespace FireteamHud
             foreach (var m in members)
             {
                 bool alive = m.Status == MemberStatus.Alive;
-                var colour = alive ? Config.ColourFor(m.Name, m.JoinIndex) : ToColor(Palette.Dead);
+                var colour = Squad.ColourOf(m);
                 colour.a *= opacity;
 
                 GUI.color = colour;
@@ -212,7 +161,8 @@ namespace FireteamHud
                 }
 
                 Shadowed(nameRect, m.Name, _label, colour);
-                if (suffix != null) Shadowed(nameRect, suffix, _labelRight, colour);
+                if (m.Downed) Shadowed(nameRect, "DOWNED", _labelRight, Downed.Pulse(opacity));
+                else if (suffix != null) Shadowed(nameRect, suffix, _labelRight, colour);
                 y += rowHeight;
             }
         }
